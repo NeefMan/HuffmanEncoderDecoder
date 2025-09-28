@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #define INTERNAL_NODE_CODE '\0'
-#define EXTENDED_ASCII_SET_SIZE 255
+#define EXTENDED_ASCII_SET_SIZE 256
 #define HUFFMAN_LEFT_TRAVERSAL_CODE 0
 #define HUFFMAN_RIGHT_TRAVERSAL_CODE 1
 
@@ -22,6 +22,7 @@ HuffmanNode *createHuffmanTree(HuffmanNode *dummy);
 HuffmanNode *popHuffmanNode(HuffmanNode *dummy);
 void writeBit(FILE *file, int bit, unsigned char *buffer, int *bitCount);
 void flushBuffer(FILE *file, unsigned char *buffer, int *bitCount);
+void insertSymbolCodes(HuffmanNode *root, int depth);
 
 int linkedListLength = 0;
 int bitCount = 0;
@@ -37,7 +38,7 @@ int main() {
     HuffmanNode *dummy = createLinkedList(symbolFrequencies);
     //printHuffmanNodeLinkedList(dummy);
     HuffmanNode *root = createHuffmanTree(dummy);
-    //printTree(root, 0);
+    printTree(root, 0);
     FILE *file = fopen("out.txt", "wb");
     char bits[] = {"10110010011011011110001101011001000111001010101011"};
     int nbits = 50;
@@ -46,6 +47,17 @@ int main() {
     }
     flushBuffer(file, &buffer, &bitCount);
     fclose(file);
+    char *symbolCodes[EXTENDED_ASCII_SET_SIZE] = {NULL};
+    //insertSymbolCodes(root, 0);
+}
+
+void insertSymbolCodes(HuffmanNode *root, int depth)
+{
+    if (!root){
+        return;
+    }
+    insertSymbolCodes(root->left, depth+1);
+    
 }
 
 void writeBit(FILE *file, int bit, unsigned char *buffer, int *bitCount)
@@ -75,21 +87,15 @@ void printTree(HuffmanNode *root, int depth) {
     if (root == NULL) {
         return;
     }
-
-    // Print right child first (so it appears at the top when sideways)
     printTree(root->right, depth + 1);
-
-    // Print current node with indentation
     for (int i = 0; i < depth * PRINT_TREE_INDENT_STEP; i++) {
         printf(" ");
     }
     if (root->symbol != '\0') {
-        printf("%c(%d)\n", root->symbol, root->frequency);  // leaf: symbol + frequency
+        printf("%c(%d)\n", root->symbol, root->frequency);
     } else {
-        printf("*(%d)\n", root->frequency);                 // internal node: only frequency
+        printf("*(%d)\n", root->frequency);
     }
-
-    // Print left child
     printTree(root->left, depth + 1);
 }
 
@@ -119,6 +125,7 @@ HuffmanNode *createHuffmanTree(HuffmanNode *dummy)
         newInternalNode->right = node2;
         insertHuffmanNode(newInternalNode, dummy);
     }
+    return dummy->next;
 }
 
 void printHuffmanNodeLinkedList(HuffmanNode *dummy)
