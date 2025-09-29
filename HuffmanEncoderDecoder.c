@@ -1,12 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define INTERNAL_NODE_CODE '\0'
 #define EXTENDED_ASCII_SET_SIZE 256
-#define HUFFMAN_LEFT_TRAVERSAL_CODE 0
-#define HUFFMAN_RIGHT_TRAVERSAL_CODE 1
+#define HUFFMAN_LEFT_TRAVERSAL_CODE '0'
+#define HUFFMAN_RIGHT_TRAVERSAL_CODE '1'
+#define NOW_ON_LEAF_NODE 0
+#define NOW_ON_INTERNAL_NODE 1
 
 typedef struct HuffmanNode{
+    char *code;
     unsigned char symbol;
     int frequency;
     struct HuffmanNode *left, *right;
@@ -22,7 +26,8 @@ HuffmanNode *createHuffmanTree(HuffmanNode *dummy);
 HuffmanNode *popHuffmanNode(HuffmanNode *dummy);
 void writeBit(FILE *file, int bit, unsigned char *buffer, int *bitCount);
 void flushBuffer(FILE *file, unsigned char *buffer, int *bitCount);
-void insertSymbolCodes(HuffmanNode *root, int depth);
+void insertSymbolCodesHelper(char *symbolCodes[], HuffmanNode *root, int depth);
+int insertSymbolCodes(char *symbolCodes[], HuffmanNode *root, int depth);
 
 int linkedListLength = 0;
 int bitCount = 0;
@@ -30,34 +35,71 @@ unsigned char buffer = 0;
 
 int main() {
     int symbolFrequencies[EXTENDED_ASCII_SET_SIZE] = {0};
-    symbolFrequencies[99] = 1;
-    symbolFrequencies[98] = 3;
-    symbolFrequencies[101] = 4;
-    symbolFrequencies[97] = 5;
+    symbolFrequencies[97] = 1;
+    symbolFrequencies[98] = 2;
+    symbolFrequencies[99] = 3;
+    symbolFrequencies[100] = 4;
+    symbolFrequencies[101] = 5;
     symbolFrequencies[102] = 6;
+    symbolFrequencies[103] = 7;
+    symbolFrequencies[104] = 8;
+    symbolFrequencies[105] = 9;
+    symbolFrequencies[106] = 10;
+    symbolFrequencies[107] = 11;
+    symbolFrequencies[108] = 12;
+    symbolFrequencies[109] = 13;
+    symbolFrequencies[110] = 14;
+    symbolFrequencies[111] = 15;
+    symbolFrequencies[112] = 16;
+    symbolFrequencies[113] = 17;
+    symbolFrequencies[114] = 18;
+    symbolFrequencies[115] = 19;
     HuffmanNode *dummy = createLinkedList(symbolFrequencies);
     //printHuffmanNodeLinkedList(dummy);
     HuffmanNode *root = createHuffmanTree(dummy);
     printTree(root, 0);
-    FILE *file = fopen("out.txt", "wb");
-    char bits[] = {"10110010011011011110001101011001000111001010101011"};
-    int nbits = 50;
-    for (int i = 0; i < nbits; i++){
-        writeBit(file, bits[i] - '0', &buffer, &bitCount);
-    }
-    flushBuffer(file, &buffer, &bitCount);
-    fclose(file);
+    int i;
     char *symbolCodes[EXTENDED_ASCII_SET_SIZE] = {NULL};
-    //insertSymbolCodes(root, 0);
+    insertSymbolCodesHelper(symbolCodes, root, 0);
+    for (i = 0; i < EXTENDED_ASCII_SET_SIZE; i++){
+        if (symbolCodes[i]){
+            printf("%c: %s\n", i, symbolCodes[i]);
+        }
+    }
 }
 
-void insertSymbolCodes(HuffmanNode *root, int depth)
+void insertSymbolCodesHelper(char *symbolCodes[], HuffmanNode *root, int depth)
 {
+    root->code = malloc(1);   // allocate space for empty string
+    root->code[0] = '\0';
+    insertSymbolCodes(symbolCodes, root, depth);
+}
+
+int insertSymbolCodes(char *symbolCodes[], HuffmanNode *root, int depth)
+{
+    int result;
     if (!root){
-        return;
+        return NOW_ON_LEAF_NODE;
     }
-    insertSymbolCodes(root->left, depth+1);
-    
+    if (root->left){
+        root->left->code = malloc(depth+2);
+        strcpy(root->left->code, root->code);
+        root->left->code[depth] = HUFFMAN_LEFT_TRAVERSAL_CODE;
+        root->left->code[depth+1] = '\0';
+    }
+    if (root->right){
+        root->right->code = malloc(depth+2);
+        strcpy(root->right->code, root->code);
+        root->right->code[depth] = HUFFMAN_RIGHT_TRAVERSAL_CODE;
+        root->right->code[depth+1] = '\0';
+    }
+    result = insertSymbolCodes(symbolCodes, root->left, depth+1);
+    if (result == NOW_ON_LEAF_NODE){
+        symbolCodes[root->symbol] = malloc(depth+1);
+        strcpy(symbolCodes[root->symbol], root->code);
+        return NOW_ON_INTERNAL_NODE;
+    }
+    result = insertSymbolCodes(symbolCodes, root->right, depth+1);
 }
 
 void writeBit(FILE *file, int bit, unsigned char *buffer, int *bitCount)
