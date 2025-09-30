@@ -28,12 +28,16 @@ void writeBit(FILE *file, int bit, unsigned char *buffer, int *bitCount);
 void flushBuffer(FILE *file, unsigned char *buffer, int *bitCount);
 void insertSymbolCodesHelper(char *symbolCodes[], HuffmanNode *root, int depth);
 int insertSymbolCodes(char *symbolCodes[], HuffmanNode *root, int depth);
+void printSymbolCodes(char *symbolCodes[]);
+void encodeFile(char *symbolCodes[], HuffmanNode *root);
+void ensureProperUsage(int argc, char *argv[]);
 
 int linkedListLength = 0;
 int bitCount = 0;
 unsigned char buffer = 0;
 
-int main() {
+int main(int argc, char *argv[]) {
+    ensureProperUsage(argc, argv);
     int symbolFrequencies[EXTENDED_ASCII_SET_SIZE] = {0};
     symbolFrequencies[97] = 1;
     symbolFrequencies[98] = 2;
@@ -57,11 +61,39 @@ int main() {
     HuffmanNode *dummy = createLinkedList(symbolFrequencies);
     //printHuffmanNodeLinkedList(dummy);
     HuffmanNode *root = createHuffmanTree(dummy);
-    printTree(root, 0);
-    int i;
+    //printTree(root, 0);
     char *symbolCodes[EXTENDED_ASCII_SET_SIZE] = {NULL};
     insertSymbolCodesHelper(symbolCodes, root, 0);
-    for (i = 0; i < EXTENDED_ASCII_SET_SIZE; i++){
+    //printSymbolCodes(symbolCodes);
+    encodeFile(symbolCodes, root);
+}
+
+void ensureProperUsage(int argc, char *argv[])
+{
+    if (argc != 3){
+        fprintf(stderr, "Proper usage: %s [encode/decode] [file-name]\n", argv[0]);
+        exit(1);
+    }
+    if (strcmp(argv[1], "encode") != 0 && strcmp(argv[1], "decode") != 0){
+        fprintf(stderr, "Unknown command: %s\nProper usage: %s [encode/decode] [file-name]\n", argv[1], argv[0]);
+        exit(1);
+    }
+    FILE *file = fopen(argv[2], "r");
+    if (file == NULL){
+        fprintf(stderr, "Error opening file [%s]\n", argv[2]);
+        exit(1);
+    }
+    fclose(file);
+}
+
+void encodeFile(char *symbolCodes[], HuffmanNode *root)
+{
+
+}
+
+void printSymbolCodes(char *symbolCodes[])
+{
+    for (int i = 0; i < EXTENDED_ASCII_SET_SIZE; i++){
         if (symbolCodes[i]){
             printf("%c: %s\n", i, symbolCodes[i]);
         }
