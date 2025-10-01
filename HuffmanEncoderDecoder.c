@@ -24,48 +24,76 @@ HuffmanNode *createLinkedList(int symbolFrequencies[]);
 HuffmanNode *createHuffmanNode(char symbol, int frequency);
 HuffmanNode *createHuffmanTree(HuffmanNode *dummy);
 HuffmanNode *popHuffmanNode(HuffmanNode *dummy);
-void writeBit(FILE *file, int bit, unsigned char *buffer, int *bitCount);
-void flushBuffer(FILE *file, unsigned char *buffer, int *bitCount);
+void writeBit(FILE *file, int bit);
+void flushBuffer(FILE *file);
 void insertSymbolCodesHelper(char *symbolCodes[], HuffmanNode *root, int depth);
 int insertSymbolCodes(char *symbolCodes[], HuffmanNode *root, int depth);
 void printSymbolCodes(char *symbolCodes[]);
-void encodeFile(char *symbolCodes[], HuffmanNode *root);
+void printSymbolFrequencies(int symbolFrequencies[]);
 void ensureProperUsage(int argc, char *argv[]);
+void encodeFile(char *readFileName, HuffmanNode *root);
+void readFrequencies(int symbolFrequencies[], char *fileName);
 
 int linkedListLength = 0;
 int bitCount = 0;
 unsigned char buffer = 0;
+int symbolFrequencies[EXTENDED_ASCII_SET_SIZE] = {0};
+char *symbolCodes[EXTENDED_ASCII_SET_SIZE] = {NULL};
 
+
+// expected argv: [exe-name] [encode/decode] [file-name]
 int main(int argc, char *argv[]) {
     ensureProperUsage(argc, argv);
-    int symbolFrequencies[EXTENDED_ASCII_SET_SIZE] = {0};
-    symbolFrequencies[97] = 1;
-    symbolFrequencies[98] = 2;
-    symbolFrequencies[99] = 3;
-    symbolFrequencies[100] = 4;
-    symbolFrequencies[101] = 5;
-    symbolFrequencies[102] = 6;
-    symbolFrequencies[103] = 7;
-    symbolFrequencies[104] = 8;
-    symbolFrequencies[105] = 9;
-    symbolFrequencies[106] = 10;
-    symbolFrequencies[107] = 11;
-    symbolFrequencies[108] = 12;
-    symbolFrequencies[109] = 13;
-    symbolFrequencies[110] = 14;
-    symbolFrequencies[111] = 15;
-    symbolFrequencies[112] = 16;
-    symbolFrequencies[113] = 17;
-    symbolFrequencies[114] = 18;
-    symbolFrequencies[115] = 19;
+    readFrequencies(symbolFrequencies, argv[2]);
     HuffmanNode *dummy = createLinkedList(symbolFrequencies);
-    //printHuffmanNodeLinkedList(dummy);
     HuffmanNode *root = createHuffmanTree(dummy);
-    //printTree(root, 0);
-    char *symbolCodes[EXTENDED_ASCII_SET_SIZE] = {NULL};
     insertSymbolCodesHelper(symbolCodes, root, 0);
-    //printSymbolCodes(symbolCodes);
-    encodeFile(symbolCodes, root);
+    encodeFile(argv[2], root);
+}
+
+void readFrequencies(int symbolFrequencies[], char *fileName)
+{
+    FILE *file = fopen(fileName, "r");
+    if (file == NULL){
+        fprintf(stderr, "Error opening file [%s]\n", fileName);
+        exit(1);
+    }
+    int c;
+    while ((c = fgetc(file)) != EOF){
+        symbolFrequencies[c]++;
+    }
+}
+
+void encodeFile(char *readFileName, HuffmanNode *root)
+{
+    char writeFileName[] = {"output.txt"};
+    FILE *writeFile = fopen(writeFileName, "wb");
+    if (writeFile == NULL){
+        fprintf(stderr, "Error opening file [%s]\n", readFileName);
+        exit(1);
+    }
+    // Write entire symbolFrequencies array to file (4 bytes for each frequency)
+    fwrite(symbolFrequencies, sizeof(int), EXTENDED_ASCII_SET_SIZE, writeFile); 
+
+    FILE *readFile = fopen(readFileName, "r");
+    if (readFile == NULL){
+        fprintf(stderr, "Error opening file [%s]\n", readFileName);
+        exit(1);
+    }
+    
+    int c;
+    char *symbolCode;
+    while ((c = fgetc(readFile)) != EOF){
+        symbolCode = symbolCodes[c];
+        while (*symbolCode){
+            writeBit(writeFile, *symbolCode);
+            symbolCode++;
+        }
+    }
+    flushBuffer(writeFile);
+
+    fclose(readFile);
+    fclose(writeFile);
 }
 
 void ensureProperUsage(int argc, char *argv[])
@@ -86,16 +114,19 @@ void ensureProperUsage(int argc, char *argv[])
     fclose(file);
 }
 
-void encodeFile(char *symbolCodes[], HuffmanNode *root)
-{
-
-}
-
 void printSymbolCodes(char *symbolCodes[])
 {
     for (int i = 0; i < EXTENDED_ASCII_SET_SIZE; i++){
         if (symbolCodes[i]){
             printf("%c: %s\n", i, symbolCodes[i]);
+        }
+    }
+}
+
+void printSymbolFrequencies(int symbolFrequencies[]){
+    for (int i = 0; i < EXTENDED_ASCII_SET_SIZE; i++){
+        if (symbolFrequencies[i] > 0){
+            printf("%c: %d\n", i, symbolFrequencies[i]);
         }
     }
 }
@@ -134,24 +165,24 @@ int insertSymbolCodes(char *symbolCodes[], HuffmanNode *root, int depth)
     result = insertSymbolCodes(symbolCodes, root->right, depth+1);
 }
 
-void writeBit(FILE *file, int bit, unsigned char *buffer, int *bitCount)
+void writeBit(FILE *file, int bit)
 {
-    *buffer = (*buffer << 1) | (bit & 1);
-    (*bitCount)++;
-    if (*bitCount == 8){
-        fputc(*buffer, file);
-        *bitCount = 0;
-        *buffer = 0;
+    buffer = (buffer << 1) | (bit & 1);
+    bitCount++;
+    if (bitCount == 8){
+        fputc(buffer, file);
+        bitCount = 0;
+        buffer = 0;
     }
 }
 
-void flushBuffer(FILE *file, unsigned char *buffer, int *bitCount)
+void flushBuffer(FILE *file)
 {
-    if (*bitCount > 0){
-        *buffer <<= 8 - *bitCount;
-        fputc(*buffer, file);
-        *bitCount = 0;
-        *buffer = 0;
+    if (bitCount > 0){
+        buffer <<= 8 - bitCount;
+        fputc(buffer, file);
+        bitCount = 0;
+        buffer = 0;
     }
 }
 
