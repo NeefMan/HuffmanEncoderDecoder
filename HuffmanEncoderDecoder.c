@@ -33,6 +33,8 @@ void printSymbolFrequencies(int symbolFrequencies[]);
 void ensureProperUsage(int argc, char *argv[]);
 void encodeFile(char *readFileName, HuffmanNode *root);
 void readFrequencies(int symbolFrequencies[], char *fileName);
+void decodeFile(FILE *readFile);
+FILE *safefopen(char *fileName, char *method);
 
 int linkedListLength = 0;
 int bitCount = 0;
@@ -40,24 +42,50 @@ unsigned char buffer = 0;
 int symbolFrequencies[EXTENDED_ASCII_SET_SIZE] = {0};
 char *symbolCodes[EXTENDED_ASCII_SET_SIZE] = {NULL};
 
-
 // expected argv: [exe-name] [encode/decode] [file-name]
 int main(int argc, char *argv[]) {
     ensureProperUsage(argc, argv);
-    readFrequencies(symbolFrequencies, argv[2]);
+    char *fileName = argv[2];
+    char *usage = argv[1];
+    FILE *readFile;
+
+    if (strcmp(usage, "encode") == 0){
+        readFrequencies(symbolFrequencies, fileName);
+    }else{
+        readFile = safefopen(fileName, "rb");
+        fread(symbolFrequencies, sizeof(int), 256, readFile);
+    }
+
     HuffmanNode *dummy = createLinkedList(symbolFrequencies);
     HuffmanNode *root = createHuffmanTree(dummy);
     insertSymbolCodesHelper(symbolCodes, root, 0);
-    encodeFile(argv[2], root);
+
+    if (strcmp(usage, "encode") == 0){
+        encodeFile(fileName, root);
+    }else{
+        decodeFile(readFile);
+    }
 }
 
-void readFrequencies(int symbolFrequencies[], char *fileName)
+FILE *safefopen(char *fileName, char *method)
 {
-    FILE *file = fopen(fileName, "r");
+    FILE *file = fopen(fileName, method);
     if (file == NULL){
         fprintf(stderr, "Error opening file [%s]\n", fileName);
         exit(1);
     }
+    return file;
+}
+
+void decodeFile(FILE *readFile)
+{
+    FILE *outputFile = safefopen("decoded_output.txt", "w");
+    // what is the next step????
+}
+
+void readFrequencies(int symbolFrequencies[], char *fileName)
+{
+    FILE *file = safefopen(fileName, "r");
     int c;
     while ((c = fgetc(file)) != EOF){
         symbolFrequencies[c]++;
@@ -67,19 +95,11 @@ void readFrequencies(int symbolFrequencies[], char *fileName)
 void encodeFile(char *readFileName, HuffmanNode *root)
 {
     char writeFileName[] = {"output.txt"};
-    FILE *writeFile = fopen(writeFileName, "wb");
-    if (writeFile == NULL){
-        fprintf(stderr, "Error opening file [%s]\n", readFileName);
-        exit(1);
-    }
+    FILE *writeFile = safefopen(writeFileName, "wb");
     // Write entire symbolFrequencies array to file (4 bytes for each frequency)
     fwrite(symbolFrequencies, sizeof(int), EXTENDED_ASCII_SET_SIZE, writeFile); 
 
-    FILE *readFile = fopen(readFileName, "r");
-    if (readFile == NULL){
-        fprintf(stderr, "Error opening file [%s]\n", readFileName);
-        exit(1);
-    }
+    FILE *readFile = safefopen(readFileName, "r");
     
     int c;
     char *symbolCode;
@@ -106,11 +126,7 @@ void ensureProperUsage(int argc, char *argv[])
         fprintf(stderr, "Unknown command: %s\nProper usage: %s [encode/decode] [file-name]\n", argv[1], argv[0]);
         exit(1);
     }
-    FILE *file = fopen(argv[2], "r");
-    if (file == NULL){
-        fprintf(stderr, "Error opening file [%s]\n", argv[2]);
-        exit(1);
-    }
+    FILE *file = safefopen(argv[2], "r");
     fclose(file);
 }
 
