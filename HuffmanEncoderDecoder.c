@@ -33,7 +33,7 @@ void printSymbolFrequencies(int symbolFrequencies[]);
 void ensureProperUsage(int argc, char *argv[]);
 void encodeFile(char *readFileName, HuffmanNode *root);
 void readFrequencies(int symbolFrequencies[], char *fileName);
-void decodeFile(FILE *readFile);
+void decodeFile(FILE *readFile, HuffmanNode *root);
 FILE *safefopen(char *fileName, char *method);
 
 int linkedListLength = 0;
@@ -63,8 +63,9 @@ int main(int argc, char *argv[]) {
     if (strcmp(usage, "encode") == 0){
         encodeFile(fileName, root);
     }else{
-        decodeFile(readFile);
+        decodeFile(readFile, root);
     }
+    fclose(readFile);
 }
 
 FILE *safefopen(char *fileName, char *method)
@@ -77,10 +78,27 @@ FILE *safefopen(char *fileName, char *method)
     return file;
 }
 
-void decodeFile(FILE *readFile)
+void decodeFile(FILE *readFile, HuffmanNode *root)
 {
     FILE *outputFile = safefopen("decoded_output.txt", "w");
-    // what is the next step????
+    HuffmanNode *node = root;
+    int byte;
+    int bitCount, bit;
+
+    while ((byte = fgetc(readFile)) != EOF){
+        for (bitCount = 7; bitCount >= 0; bitCount--){
+            bit = (byte >> bitCount) & 1;
+            if (bit == 0){
+                node = node->left;
+            }else{
+                node = node->right;
+            }
+            if (!node->left){
+                fputc(node->symbol, outputFile);
+                node = root;
+            }
+        }
+    }
 }
 
 void readFrequencies(int symbolFrequencies[], char *fileName)
@@ -182,7 +200,7 @@ int insertSymbolCodes(char *symbolCodes[], HuffmanNode *root, int depth)
 }
 
 void writeBit(FILE *file, int bit)
-{
+{   
     buffer = (buffer << 1) | (bit & 1);
     bitCount++;
     if (bitCount == 8){
