@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define INTERNAL_NODE_CODE '\0'
 #define EXTENDED_ASCII_SET_SIZE 256
@@ -8,6 +9,7 @@
 #define HUFFMAN_RIGHT_TRAVERSAL_CODE 1
 #define NOW_ON_LEAF_NODE 0
 #define NOW_ON_INTERNAL_NODE 1
+#define IO_FILE_BUFFER_SIZE 4096
 
 typedef struct SymbolCodeNode{
     unsigned int code;
@@ -21,34 +23,40 @@ typedef struct HuffmanNode{
     struct HuffmanNode *next;
 }HuffmanNode;
 
-void insertHuffmanNode(HuffmanNode *newNode, HuffmanNode *dummy);
+void ensureProperUsage(int argc, char *argv[]);
+FILE *safefopen(char *fileName, char *method);
+
 void printHuffmanNodeLinkedList(HuffmanNode *dummy);
 void printTree(HuffmanNode *root, int depth);
+void printSymbolCodes(SymbolCodeNode *symbolCodes[]);
+void printSymbolFrequencies(int symbolFrequencies[]);
+void printBinary(unsigned int n, int length);
+
+void insertHuffmanNode(HuffmanNode *newNode, HuffmanNode *dummy);
+int insertSymbolCodes(SymbolCodeNode *symbolCodes[], HuffmanNode *root);
+void readFrequencies(int symbolFrequencies[], char *fileName);
+
 HuffmanNode *createLinkedList(int symbolFrequencies[]);
 HuffmanNode *createHuffmanNode(unsigned char symbol, int frequency);
 HuffmanNode *createHuffmanTree(HuffmanNode *dummy);
 HuffmanNode *popHuffmanNode(HuffmanNode *dummy);
-void writeBit(FILE *file, int bit);
+
 void flushBuffer(FILE *file);
-int insertSymbolCodes(SymbolCodeNode *symbolCodes[], HuffmanNode *root);
-void printSymbolCodes(SymbolCodeNode *symbolCodes[]);
-void printSymbolFrequencies(int symbolFrequencies[]);
-void ensureProperUsage(int argc, char *argv[]);
 void encodeFile(char *readFileName, HuffmanNode *root);
-void readFrequencies(int symbolFrequencies[], char *fileName);
 void decodeFile(FILE *readFile, HuffmanNode *root);
-FILE *safefopen(char *fileName, char *method);
-void printBinary(unsigned int n, int length);
+void shiftBitsIntoBuffer(int length, unsigned int symbolCode, FILE *writeFile);
 
 int linkedListLength = 0;
-int bitCount = 0;
-unsigned char buffer = 0;
 int symbolFrequencies[EXTENDED_ASCII_SET_SIZE] = {0};
 SymbolCodeNode *symbolCodes[EXTENDED_ASCII_SET_SIZE] = {NULL};
 int totalBitCount = 0;
 
 // expected argv: [exe-name] [encode/decode] [file-name]
 int main(int argc, char *argv[]) {
+    clock_t start, end;
+    double cpu_time_used;
+    start = clock();
+
     ensureProperUsage(argc, argv);
     char *fileName = argv[2];
     char *usage = argv[1];
@@ -69,8 +77,12 @@ int main(int argc, char *argv[]) {
         encodeFile(fileName, root);
     }else{
         decodeFile(readFile, root);
+        fclose(readFile);
     }
-    fclose(readFile);
+
+    end = clock();
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("%s took %f seconds to execute.\n", argv[0], cpu_time_used);
 }
 
 FILE *safefopen(char *fileName, char *method)
@@ -124,6 +136,15 @@ void readFrequencies(int symbolFrequencies[], char *fileName)
     }
 }
 
+int bitBufferBitCount = 0;
+unsigned char bitBuffer = 0;
+
+unsigned char readFileBuffer[IO_FILE_BUFFER_SIZE];
+size_t bytesRead;
+
+unsigned char writeFileBuffer[IO_FILE_BUFFER_SIZE];
+size_t writeFileBufferIndex = 0;
+
 void encodeFile(char *readFileName, HuffmanNode *root)
 {
     char writeFileName[] = {"output.txt"};
@@ -132,19 +153,48 @@ void encodeFile(char *readFileName, HuffmanNode *root)
     fwrite(symbolFrequencies, sizeof(int), EXTENDED_ASCII_SET_SIZE, writeFile); 
 
     FILE *readFile = safefopen(readFileName, "r");
-    
-    int c, i;
-    int symbolCode;
-    while ((c = fgetc(readFile)) != EOF){
-        symbolCode = symbolCodes[c]->code;
-        for (i = symbolCodes[c]->bitCount-1; i >= 0; i--){
-            writeBit(writeFile, (symbolCode >> i) & 1);
+
+    while ((bytesRead = fread(readFileBuffer, 1, sizeof(readFileBuffer), readFile)) > 0) {
+        for (size_t i = 0; i < bytesRead; i++) {
+            int symbol = readFileBuffer[i];
+            unsigned int symbolCode = symbolCodes[symbol]->code;
+            int length = symbolCodes[symbol]->bitCount;
+            shiftBitsIntoBuffer(length, symbolCode, writeFile);
         }
     }
+    // flush write file buffer
+    fwrite(writeFileBuffer, 1, writeFileBufferIndex, writeFile);
     flushBuffer(writeFile);
 
     fclose(readFile);
     fclose(writeFile);
+}
+
+void shiftBitsIntoBuffer(int length, unsigned int symbolCode, FILE *writeFile)
+{
+    for (int j = length - 1; j >= 0; j--) {
+        bitBuffer = (bitBuffer << 1) | ((symbolCode >> j) & 1);
+        bitBufferBitCount++;
+        if (bitBufferBitCount == 8){
+            if (writeFileBufferIndex == IO_FILE_BUFFER_SIZE){
+                fwrite(writeFileBuffer, 1, sizeof(writeFileBuffer), writeFile);
+                writeFileBufferIndex = 0;
+            }
+            writeFileBuffer[writeFileBufferIndex++] = bitBuffer;
+            bitBufferBitCount = 0;
+            bitBuffer = 0;
+        }
+    }
+}
+
+void flushBuffer(FILE *file)
+{
+    if (bitBufferBitCount > 0){
+        bitBuffer <<= 8 - bitBufferBitCount;
+        fputc(bitBuffer, file);
+        bitBufferBitCount = 0;
+        bitBuffer = 0;
+    }
 }
 
 void ensureProperUsage(int argc, char *argv[])
@@ -209,27 +259,6 @@ int insertSymbolCodes(SymbolCodeNode *symbolCodes[], HuffmanNode *root)
         return NOW_ON_INTERNAL_NODE;
     }
     result = insertSymbolCodes(symbolCodes, root->right);
-}
-
-void writeBit(FILE *file, int bit)
-{   
-    buffer = (buffer << 1) | (bit & 1);
-    bitCount++;
-    if (bitCount == 8){
-        fputc(buffer, file);
-        bitCount = 0;
-        buffer = 0;
-    }
-}
-
-void flushBuffer(FILE *file)
-{
-    if (bitCount > 0){
-        buffer <<= 8 - bitCount;
-        fputc(buffer, file);
-        bitCount = 0;
-        buffer = 0;
-    }
 }
 
 #define PRINT_TREE_INDENT_STEP 4
