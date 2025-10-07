@@ -95,38 +95,6 @@ FILE *safefopen(char *fileName, char *method)
     return file;
 }
 
-void decodeFile(FILE *readFile, HuffmanNode *root)
-{
-    FILE *outputFile = safefopen("decoded_output.txt", "w");
-    HuffmanNode *node = root;
-    int bitShiftN, bit, bitsRemaining;
-    unsigned c;
-    bitsRemaining = totalBitCount;
-
-    while ((c = fgetc(readFile)) != EOF){
-        if (bitsRemaining < 8){
-            c = c >> 8 - bitsRemaining;
-            bitShiftN = bitsRemaining-1;
-        }else{
-            bitShiftN = 7;
-        }
-        while (bitShiftN >= 0){
-            bit = (c >> bitShiftN) & 1;
-            if (bit == 0){
-                node = node->left;
-            }else{
-                node = node->right;
-            }
-            if (!node->left){
-                fputc(node->symbol, outputFile);
-                node = root;
-            }
-            bitShiftN--;
-            bitsRemaining--;
-        }
-    }
-}
-
 void readFrequencies(int symbolFrequencies[], char *fileName)
 {
     FILE *file = safefopen(fileName, "r");
@@ -168,6 +136,47 @@ void encodeFile(char *readFileName, HuffmanNode *root)
 
     fclose(readFile);
     fclose(writeFile);
+}
+
+void decodeFile(FILE *readFile, HuffmanNode *root)
+{
+    FILE *outputFile = safefopen("decoded_output.txt", "w");
+    HuffmanNode *node = root;
+    int bitShiftN, bit, bitsRemaining;
+    unsigned c;
+    bitsRemaining = totalBitCount;
+
+    while ((bytesRead = fread(readFileBuffer, 1, sizeof(readFileBuffer), readFile)) > 0){
+        for (size_t i = 0; i < bytesRead; i++){
+            c = readFileBuffer[i];
+            if (bitsRemaining < 8){
+                c = c >> 8 - bitsRemaining;
+                bitShiftN = bitsRemaining-1;
+            }else{
+                bitShiftN = 7;
+            }
+            while (bitShiftN >= 0){
+                bit = (c >> bitShiftN) & 1;
+                if (bit == 0){
+                    node = node->left;
+                }else{
+                    node = node->right;
+                }
+                if (!node->left){
+                    if (writeFileBufferIndex == IO_FILE_BUFFER_SIZE){
+                        fwrite(writeFileBuffer, 1, sizeof(writeFileBuffer), outputFile);
+                        writeFileBufferIndex = 0;
+                    }
+                    writeFileBuffer[writeFileBufferIndex++] = node->symbol;
+                    node = root;
+                }
+                bitShiftN--;
+                bitsRemaining--;
+            }
+        }
+    }
+    // flush write file buffer
+    fwrite(writeFileBuffer, 1, writeFileBufferIndex, outputFile);
 }
 
 void shiftBitsIntoBuffer(int length, unsigned int symbolCode, FILE *writeFile)
