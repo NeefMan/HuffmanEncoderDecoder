@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define INTERNAL_NODE_CODE '\0'
 #define EXTENDED_ASCII_SET_SIZE 256
@@ -49,6 +50,10 @@ int totalBitCount = 0;
 
 // expected argv: [exe-name] [encode/decode] [file-name]
 int main(int argc, char *argv[]) {
+    clock_t start, end;
+    double cpu_time_used;
+    start = clock();
+
     ensureProperUsage(argc, argv);
     char *fileName = argv[2];
     char *usage = argv[1];
@@ -69,8 +74,12 @@ int main(int argc, char *argv[]) {
         encodeFile(fileName, root);
     }else{
         decodeFile(readFile, root);
+        fclose(readFile);
     }
-    fclose(readFile);
+
+    end = clock();
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf("%s took %f seconds to execute.\n", argv[0], cpu_time_used);
 }
 
 FILE *safefopen(char *fileName, char *method)
